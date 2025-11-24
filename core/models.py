@@ -88,6 +88,27 @@ class Track(models.Model):
         self.deleted_at = timezone.now()
         self.save()
 
+    @property
+    def duration_minutes(self):
+        """Return duration as M:SS string."""
+        if not self.duration:
+            return "0:00"
+        minutes = int(self.duration // 60)
+        secs = int(self.duration % 60)
+        return f"{minutes}:{secs:02d}"
+
+    @property
+    def file_size_mb(self):
+        """Return file size in MB."""
+        if not self.file_size:
+            return "0.00"
+        return f"{self.file_size / 1024 / 1024:.2f}"
+
+    @property
+    def review_count(self):
+        """Get count of reviews for this track."""
+        return self.reviews.filter(is_flagged=False).count()
+
 
 class Review(models.Model):
     """Review submitted for a track."""

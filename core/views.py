@@ -4,8 +4,11 @@ Views for Masterswap frontend pages.
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
+from django.contrib import messages
 from django.db.models import Count
+from django.utils import timezone
+from django.core.paginator import Paginator
 from sesame.utils import get_user
 from core.models import Track, Review, Transaction
 from core.utils import can_use_cold_start, count_reviewable_tracks
@@ -71,15 +74,37 @@ def dashboard(request):
         user=user
     ).select_related('related_track', 'related_review')[:5]
 
+    # Recent tracks available to review
+    recent_tracks = Track.objects.filter(
+        is_deleted=False
+    ).exclude(
+        uploader=user
+    ).exclude(
+        reviews__reviewer=user
+    ).annotate(
+        review_count=Count('reviews')
+    ).select_related('uploader').order_by('-uploaded_at')[:5]
+
+    # Create stats object with can_use_cold_start
+    stats = {
+        'tracks_uploaded': tracks_uploaded,
+        'reviews_given': reviews_given,
+        'reviews_received': reviews_received,
+        'can_use_cold_start': can_cold_start,
+        'reviewable_count': reviewable_count,
+    }
+
     context = {
         'user': user,
         'token_balance': user.token_balance,
+        'stats': stats,
         'tracks_uploaded': tracks_uploaded,
         'reviews_given': reviews_given,
         'reviews_received': reviews_received,
         'can_cold_start': can_cold_start,
         'reviewable_count': reviewable_count,
         'recent_transactions': recent_transactions,
+        'recent_tracks': recent_tracks,
     }
 
     return render(request, 'dashboard.html', context)
@@ -90,7 +115,11 @@ def browse_tracks(request):
     """Browse tracks available for review."""
     user = request.user
 
-    # Get tracks (exclude user's own and already reviewed)
+    # Get sorting and filter parameters
+    sort = request.GET.get('sort', 'newest')
+    unreviewed_only = request.GET.get('unreviewed_only', False)
+
+    # Base queryset (exclude user's own and already reviewed)
     tracks = Track.objects.filter(
         is_deleted=False
     ).exclude(
@@ -99,10 +128,29 @@ def browse_tracks(request):
         reviews__reviewer=user
     ).annotate(
         review_count=Count('reviews')
-    ).select_related('uploader').order_by('-uploaded_at')
+    ).select_related('uploader')
+
+    # Apply sorting
+    if sort == 'least_reviewed':
+        tracks = tracks.order_by('review_count', '-uploaded_at')
+    else:  # newest (default)
+        tracks = tracks.order_by('-uploaded_at')
+
+    # Apply filter for unreviewed only
+    if unreviewed_only:
+        tracks = tracks.filter(review_count=0)
+
+    # Pagination
+    paginator = Paginator(tracks, 20)  # 20 tracks per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
 
     context = {
-        'tracks': tracks,
+        'tracks': page_obj,
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
+        'sort': sort,
+        'unreviewed_only': unreviewed_only,
     }
 
     return render(request, 'browse_tracks.html', context)
@@ -166,8 +214,15 @@ def my_tracks(request):
         review_count=Count('reviews')
     ).order_by('-uploaded_at')
 
+    # Pagination
+    paginator = Paginator(tracks, 20)  # 20 tracks per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'tracks': tracks,
+        'tracks': page_obj,
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
     }
 
     return render(request, 'my_tracks.html', context)
@@ -182,8 +237,19 @@ def my_reviews(request):
         reviewer=user
     ).select_related('track').order_by('-created_at')
 
+    # Get total count
+    total_reviews = reviews.count()
+
+    # Pagination
+    paginator = Paginator(reviews, 20)  # 20 reviews per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'reviews': reviews,
+        'reviews': page_obj,
+        'total_reviews': total_reviews,
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
     }
 
     return render(request, 'my_reviews.html', context)
@@ -218,7 +284,7 @@ def user_profile(request, user_id):
     profile_user = get_object_or_404(User, id=user_id)
 
     # Get user's tracks
-    tracks = Track.objects.filter(
+    user_tracks = Track.objects.filter(
         uploader=profile_user,
         is_deleted=False
     ).annotate(
@@ -226,14 +292,36 @@ def user_profile(request, user_id):
     ).order_by('-uploaded_at')[:10]
 
     # Get user's reviews
-    reviews = Review.objects.filter(
+    user_reviews = Review.objects.filter(
         reviewer=profile_user
     ).select_related('track').order_by('-created_at')[:10]
 
+    # Calculate user stats
+    tracks_uploaded = Track.objects.filter(
+        uploader=profile_user,
+        is_deleted=False
+    ).count()
+
+    reviews_given = Review.objects.filter(
+        reviewer=profile_user
+    ).count()
+
+    reviews_received = Review.objects.filter(
+        track__uploader=profile_user,
+        track__is_deleted=False
+    ).count()
+
+    user_stats = {
+        'tracks_uploaded': tracks_uploaded,
+        'reviews_given': reviews_given,
+        'reviews_received': reviews_received,
+    }
+
     context = {
         'profile_user': profile_user,
-        'tracks': tracks,
-        'reviews': reviews,
+        'user_tracks': user_tracks,
+        'user_reviews': user_reviews,
+        'user_stats': user_stats,
     }
 
     return render(request, 'user_profile.html', context)
@@ -248,8 +336,83 @@ def transaction_history(request):
         user=user
     ).select_related('related_track', 'related_review').order_by('-created_at')
 
+    # Calculate summary stats
+    from django.db.models import Sum, Q
+    earned_sum = transactions.filter(amount__gt=0).aggregate(Sum('amount'))['amount__sum'] or 0
+    spent_sum = abs(transactions.filter(amount__lt=0).aggregate(Sum('amount'))['amount__sum'] or 0)
+    net_change = earned_sum - spent_sum
+
+    reviews_count = transactions.filter(
+        transaction_type=Transaction.TransactionType.REVIEW_EARNED
+    ).count()
+
+    uploads_count = transactions.filter(
+        Q(transaction_type=Transaction.TransactionType.UPLOAD_SPENT) |
+        Q(transaction_type=Transaction.TransactionType.COLD_START_UPLOAD)
+    ).count()
+
+    # Pagination
+    paginator = Paginator(transactions, 50)  # 50 transactions per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'transactions': transactions,
+        'transactions': page_obj,
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
+        'total_earned': earned_sum,
+        'total_spent': spent_sum,
+        'net_change': net_change,
+        'reviews_count': reviews_count,
+        'uploads_count': uploads_count,
     }
 
     return render(request, 'transaction_history.html', context)
+
+
+def logout_view(request):
+    """Logout the user."""
+    if request.method == 'POST':
+        logout(request)
+        messages.success(request, "You've been successfully logged out.")
+        return redirect('landing')
+    return redirect('dashboard')
+
+
+@login_required
+def flag_review(request, review_id):
+    """Flag a review for moderation."""
+    if request.method == 'POST':
+        review = get_object_or_404(Review, id=review_id)
+
+        # Only track owner can flag
+        if request.user != review.track.uploader:
+            messages.error(request, "You can only flag reviews on your own tracks.")
+            return redirect('track_detail', track_id=review.track.id)
+
+        review.is_flagged = True
+        review.flagged_by = request.user
+        review.flagged_at = timezone.now()
+        review.save()
+
+        messages.success(request, "Review has been flagged for moderation.")
+        return redirect('track_reviews', track_id=review.track.id)
+
+    return redirect('dashboard')
+
+
+@login_required
+def delete_track(request, track_id):
+    """Delete a track (soft delete)."""
+    if request.method == 'POST':
+        track = get_object_or_404(Track, id=track_id, uploader=request.user)
+
+        # Soft delete
+        track.is_deleted = True
+        track.deleted_at = timezone.now()
+        track.save()
+
+        messages.success(request, f"Track '{track.title}' has been deleted.")
+        return redirect('my_tracks')
+
+    return redirect('my_tracks')
