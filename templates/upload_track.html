@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Track - Masterswap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">
+            Upload Your Track
+        </h1>
+        <p class="text-gray-600">
+            Share your mix with the community and receive professional feedback
+        </p>
+    </div>
+
+    <!-- Token Cost Info -->
+    {% if is_cold_start %}
+    <div class="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+        <div class="flex">
+            <svg class="w-6 h-6 text-green-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+                <h3 class="text-lg font-semibold text-green-900 mb-2">
+                    Free Upload Available!
+                </h3>
+                <p class="text-green-800">
+                    Since there are fewer than 3 tracks on the platform, you can upload one track for free to help seed the community. This is a one-time offer!
+                </p>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-primary-50 border border-primary-200 rounded-lg p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <svg class="w-6 h-6 text-primary-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                    <p class="text-sm text-primary-600 font-medium">Cost</p>
+                    <p class="text-2xl font-bold text-primary-900">1 Token</p>
+                </div>
+            </div>
+            <div>
+                <p class="text-sm text-primary-600 font-medium">Your Balance</p>
+                <p class="text-2xl font-bold text-primary-900">{{ user.token_balance }} Token{{ user.token_balance|pluralize }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Upload Form -->
+    <div class="bg-white rounded-lg shadow-md p-8">
+        <form method="post" enctype="multipart/form-data" id="uploadForm" x-data="{
+            title: '',
+            feedbackRequest: '',
+            file: null,
+            uploading: false,
+            error: '',
+            uploadProgress: 0,
+            fileError: '',
+            validateFile(event) {
+                const file = event.target.files[0];
+                this.fileError = '';
+
+                if (!file) {
+                    this.file = null;
+                    return;
+                }
+
+                // Check file type
+                const validTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/flac', 'audio/aac', 'audio/ogg'];
+                const validExtensions = ['.mp3', '.wav', '.flac', '.aac', '.ogg'];
+                const hasValidExtension = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+
+                if (!validTypes.includes(file.type) && !hasValidExtension) {
+                    this.fileError = 'Invalid file type. Please upload MP3, WAV, FLAC, AAC, or OGG files.';
+                    event.target.value = '';
+                    this.file = null;
+                    return;
+                }
+
+                // Check file size (20MB = 20 * 1024 * 1024 bytes)
+                if (file.size > 20 * 1024 * 1024) {
+                    this.fileError = 'File is too large. Maximum file size is 20MB.';
+                    event.target.value = '';
+                    this.file = null;
+                    return;
+                }
+
+                this.file = file;
+            },
+            async submitForm(event) {
+                event.preventDefault();
+
+                if (!this.file) {
+                    this.error = 'Please select an audio file to upload.';
+                    return;
+                }
+
+                if (!this.title.trim()) {
+                    this.error = 'Please enter a title for your track.';
+                    return;
+                }
+
+                this.uploading = true;
+                this.error = '';
+                this.uploadProgress = 0;
+
+                const formData = new FormData();
+                formData.append('file', this.file);
+                formData.append('title', this.title.trim());
+                if (this.feedbackRequest.trim()) {
+                    formData.append('feedback_request', this.feedbackRequest.trim());
+                }
+
+                try {
+                    const xhr = new XMLHttpRequest();
+
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            this.uploadProgress = Math.round((e.loaded / e.total) * 100);
+                        }
+                    });
+
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status === 201) {
+                            const data = JSON.parse(xhr.responseText);
+                            window.location.href = '/my-tracks';
+                        } else {
+                            const error = JSON.parse(xhr.responseText);
+                            this.error = error.detail || 'Upload failed. Please try again.';
+                            this.uploading = false;
+                        }
+                    });
+
+                    xhr.addEventListener('error', () => {
+                        this.error = 'Network error. Please check your connection and try again.';
+                        this.uploading = false;
+                    });
+
+                    xhr.open('POST', '/api/tracks/');
+                    xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+                    xhr.send(formData);
+
+                } catch (error) {
+                    this.error = 'An unexpected error occurred. Please try again.';
+                    this.uploading = false;
+                }
+            }
+        }">
+            {% csrf_token %}
+
+            <div class="mb-6">
+                <label for="file" class="block text-sm font-medium text-gray-700 mb-2">
+                    Audio File *
+                </label>
+                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-primary-400 transition-colors">
+                    <div class="space-y-1 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                        </svg>
+                        <div class="flex text-sm text-gray-600">
+                            <label for="file" class="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
+                                <span>Upload a file</span>
+                                <input id="file" name="file" type="file" accept="audio/*,.mp3,.wav,.flac,.aac,.ogg" class="sr-only" required @change="validateFile" :disabled="uploading">
+                            </label>
+                            <p class="pl-1">or drag and drop</p>
+                        </div>
+                        <p class="text-xs text-gray-500">MP3, WAV, FLAC, AAC, or OGG up to 20MB</p>
+                        <p class="text-xs text-gray-500">Maximum duration: 10 minutes</p>
+                    </div>
+                </div>
+                <div x-show="file" class="mt-2 text-sm text-gray-600">
+                    <p>Selected: <span class="font-medium" x-text="file ? file.name : ''"></span></p>
+                    <p x-text="file ? '(' + (file.size / 1024 / 1024).toFixed(2) + ' MB)' : ''"></p>
+                </div>
+                <div x-show="fileError" class="mt-2 text-sm text-red-600" x-text="fileError"></div>
+            </div>
+
+            <div class="mb-6">
+                <label for="title" class="block text-sm font-medium text-gray-700 mb-2">
+                    Track Title *
+                </label>
+                <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    x-model="title"
+                    required
+                    maxlength="200"
+                    :disabled="uploading"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
+                    placeholder="Give your track a descriptive title"
+                >
+            </div>
+
+            <div class="mb-6">
+                <label for="feedback_request" class="block text-sm font-medium text-gray-700 mb-2">
+                    What feedback are you looking for? (Optional)
+                </label>
+                <textarea
+                    id="feedback_request"
+                    name="feedback_request"
+                    x-model="feedbackRequest"
+                    maxlength="1000"
+                    rows="4"
+                    :disabled="uploading"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
+                    placeholder="e.g., 'Is the vocal sitting well in the mix?' or 'How's the low end balance?'"
+                ></textarea>
+                <p class="text-xs text-gray-500 mt-1">
+                    Help reviewers give you better feedback by being specific
+                </p>
+            </div>
+
+            <div x-show="error" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p class="text-sm text-red-800" x-text="error"></p>
+            </div>
+
+            <div x-show="uploading" class="mb-4">
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="text-gray-700 font-medium">Uploading...</span>
+                    <span class="text-primary-600 font-semibold" x-text="uploadProgress + '%'"></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-primary-600 h-2 rounded-full transition-all duration-300" :style="'width: ' + uploadProgress + '%'"></div>
+                </div>
+            </div>
+
+            <button
+                type="submit"
+                @click="submitForm"
+                :disabled="uploading || !file"
+                class="w-full px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+                <span x-show="!uploading">
+                    {% if is_cold_start %}
+                    Upload Track (Free - One Time Only)
+                    {% else %}
+                    Upload Track (Costs 1 Token)
+                    {% endif %}
+                </span>
+                <span x-show="uploading">
+                    Uploading...
+                </span>
+            </button>
+        </form>
+    </div>
+
+    <!-- Info Box -->
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-3">Upload Guidelines</h3>
+        <ul class="space-y-2 text-sm text-blue-800">
+            <li class="flex items-start">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span><strong>Supported formats:</strong> MP3, WAV, FLAC, AAC, OGG</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span><strong>File size limit:</strong> 20MB maximum</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span><strong>Duration limit:</strong> 10 minutes maximum</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span><strong>Email notifications:</strong> You'll be notified when your track receives reviews</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span><strong>Deletion:</strong> You can delete your track anytime from the My Tracks page</span>
+            </li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

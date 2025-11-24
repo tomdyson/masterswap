@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Masterswap{% endblock %}
+
+{% block content %}
+<!-- Welcome Header -->
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">
+        Welcome back, {{ user.email.split('@').0|title }}
+    </h1>
+    <p class="text-gray-600">
+        Here's your Masterswap activity overview
+    </p>
+</div>
+
+<!-- Token Balance - Prominent Display -->
+<div class="bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg p-8 mb-8 text-white">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+            <p class="text-primary-100 text-sm font-medium mb-2">Your Token Balance</p>
+            <div class="flex items-baseline">
+                <p class="text-5xl font-bold">{{ stats.token_balance }}</p>
+                <p class="text-2xl ml-2 text-primary-100">token{{ stats.token_balance|pluralize }}</p>
+            </div>
+            <p class="text-primary-100 mt-2 text-sm">
+                {% if stats.token_balance == 0 %}
+                Review tracks to earn your first token!
+                {% elif stats.token_balance == 1 %}
+                You have enough to upload one track
+                {% else %}
+                You can upload {{ stats.token_balance }} track{{ stats.token_balance|pluralize }}
+                {% endif %}
+            </p>
+        </div>
+        <div class="mt-6 md:mt-0 space-x-4">
+            <a href="{% url 'browse_tracks' %}" class="inline-block px-6 py-3 bg-white text-primary-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                Review Tracks
+            </a>
+            {% if stats.token_balance > 0 or stats.can_use_cold_start %}
+            <a href="{% url 'upload_track' %}" class="inline-block px-6 py-3 bg-primary-800 text-white rounded-lg font-semibold hover:bg-primary-900 transition-colors border-2 border-primary-500">
+                Upload Track
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="grid md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <svg class="w-12 h-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+            </div>
+            <div class="ml-5 w-0 flex-1">
+                <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">
+                        Tracks Uploaded
+                    </dt>
+                    <dd class="text-3xl font-semibold text-gray-900">
+                        {{ stats.tracks_uploaded }}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+        <div class="mt-4">
+            <a href="{% url 'my_tracks' %}" class="text-sm font-medium text-primary-600 hover:text-primary-700">
+                View my tracks →
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </div>
+            <div class="ml-5 w-0 flex-1">
+                <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">
+                        Reviews Given
+                    </dt>
+                    <dd class="text-3xl font-semibold text-gray-900">
+                        {{ stats.reviews_given }}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+        <div class="mt-4">
+            <a href="{% url 'my_reviews' %}" class="text-sm font-medium text-green-600 hover:text-green-700">
+                View my reviews →
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <svg class="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/>
+                </svg>
+            </div>
+            <div class="ml-5 w-0 flex-1">
+                <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">
+                        Reviews Received
+                    </dt>
+                    <dd class="text-3xl font-semibold text-gray-900">
+                        {{ stats.reviews_received }}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+        <div class="mt-4">
+            <a href="{% url 'my_tracks' %}" class="text-sm font-medium text-blue-600 hover:text-blue-700">
+                View feedback →
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity Section -->
+<div class="grid md:grid-cols-2 gap-8">
+    <!-- Recent Tracks (For Review) -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-900">
+                Recent Tracks to Review
+            </h2>
+            <a href="{% url 'browse_tracks' %}" class="text-sm font-medium text-primary-600 hover:text-primary-700">
+                View all →
+            </a>
+        </div>
+
+        {% if recent_tracks %}
+        <div class="space-y-4">
+            {% for track in recent_tracks %}
+            <div class="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-gray-900 mb-1">{{ track.title }}</h3>
+                        <p class="text-sm text-gray-500">by {{ track.uploader.email.split('@').0|title }}</p>
+                        <div class="flex items-center mt-2 text-xs text-gray-500">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            {{ track.duration_minutes }}
+                        </div>
+                    </div>
+                    <a href="{% url 'track_detail' track.id %}" class="ml-4 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">
+                        Review
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+            </svg>
+            <p>No tracks available to review right now</p>
+            <p class="text-sm mt-1">Check back soon!</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-900">
+                Recent Activity
+            </h2>
+            <a href="{% url 'transaction_history' %}" class="text-sm font-medium text-primary-600 hover:text-primary-700">
+                View all →
+            </a>
+        </div>
+
+        {% if recent_transactions %}
+        <div class="space-y-3">
+            {% for transaction in recent_transactions %}
+            <div class="flex items-center py-2">
+                <div class="flex-shrink-0">
+                    {% if transaction.amount > 0 %}
+                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    {% else %}
+                    <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="ml-4 flex-1">
+                    <p class="text-sm font-medium text-gray-900">
+                        {% if transaction.transaction_type == 'REVIEW_EARNED' %}
+                        Earned from review
+                        {% elif transaction.transaction_type == 'UPLOAD_SPENT' %}
+                        Spent on upload
+                        {% elif transaction.transaction_type == 'COLD_START_UPLOAD' %}
+                        Free cold start upload
+                        {% endif %}
+                    </p>
+                    <p class="text-xs text-gray-500">{{ transaction.created_at|timesince }} ago</p>
+                </div>
+                <div class="text-sm font-semibold {% if transaction.amount > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                    {% if transaction.amount > 0 %}+{% endif %}{{ transaction.amount }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            <p>No activity yet</p>
+            <p class="text-sm mt-1">Start by reviewing a track!</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Call to Action -->
+{% if stats.token_balance == 0 and not stats.can_use_cold_start %}
+<div class="mt-8 bg-primary-50 border border-primary-200 rounded-lg p-6">
+    <div class="flex">
+        <svg class="w-6 h-6 text-primary-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+        </svg>
+        <div>
+            <h3 class="text-lg font-semibold text-primary-900 mb-2">
+                Get Started with Your First Review
+            </h3>
+            <p class="text-primary-800 mb-4">
+                You need at least 1 token to upload a track. Review another engineer's track to earn your first token!
+            </p>
+            <a href="{% url 'browse_tracks' %}" class="inline-block px-6 py-2 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors">
+                Browse Tracks to Review
+            </a>
+        </div>
+    </div>
+</div>
+{% elif stats.can_use_cold_start %}
+<div class="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
+    <div class="flex">
+        <svg class="w-6 h-6 text-green-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <div>
+            <h3 class="text-lg font-semibold text-green-900 mb-2">
+                Special Offer: Free Upload!
+            </h3>
+            <p class="text-green-800 mb-4">
+                Since there are fewer than 3 tracks on the platform, you can upload one track for free to help seed the community. This is a one-time offer!
+            </p>
+            <a href="{% url 'upload_track' %}" class="inline-block px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                Upload Your Track for Free
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

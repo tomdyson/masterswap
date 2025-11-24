@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Reviews for {{ track.title }} - Masterswap{% endblock %}
+
+{% block content %}
+<!-- Back Button -->
+<div class="mb-6">
+    <a href="{% url 'track_detail' track.id %}" class="inline-flex items-center text-gray-600 hover:text-gray-900">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Track
+    </a>
+</div>
+
+<!-- Track Header -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ track.title }}</h1>
+    <p class="text-gray-600 mb-4">
+        by <a href="{% url 'user_profile' track.uploader.id %}" class="text-primary-600 hover:text-primary-700">
+            {{ track.uploader.email.split('@').0|title }}
+        </a>
+    </p>
+    <div class="flex items-center text-sm text-gray-600">
+        <span class="mr-4">{{ track.review_count }} review{{ track.review_count|pluralize }}</span>
+        <span>{{ track.uploaded_at|timesince }} ago</span>
+    </div>
+</div>
+
+<!-- Reviews List -->
+{% if reviews %}
+<div class="space-y-6">
+    {% for review in reviews %}
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex items-start">
+                <div class="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center text-white font-semibold text-lg mr-4">
+                    {{ review.reviewer.email.0|upper }}
+                </div>
+                <div>
+                    <a href="{% url 'user_profile' review.reviewer.id %}" class="text-lg font-semibold text-gray-900 hover:text-primary-600">
+                        {{ review.reviewer.email.split('@').0|title }}
+                    </a>
+                    <p class="text-sm text-gray-500">{{ review.created_at|timesince }} ago</p>
+                </div>
+            </div>
+
+            {% if user == track.uploader and not review.is_flagged %}
+            <button
+                @click="if(confirm('Are you sure you want to flag this review for moderation?')) { document.getElementById('flag-form-{{ review.id }}').submit(); }"
+                class="text-sm text-gray-500 hover:text-red-600 flex items-center"
+            >
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
+                </svg>
+                Flag
+            </button>
+            <form id="flag-form-{{ review.id }}" action="{% url 'flag_review' review.id %}" method="post" class="hidden">
+                {% csrf_token %}
+            </form>
+            {% endif %}
+
+            {% if review.is_flagged %}
+            <span class="text-sm text-red-600 font-medium flex items-center">
+                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/>
+                </svg>
+                Flagged
+            </span>
+            {% endif %}
+        </div>
+
+        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+            <p class="text-sm text-gray-700">
+                <strong class="text-gray-900">Listening on:</strong> {{ review.equipment }}
+            </p>
+        </div>
+
+        <div class="prose max-w-none">
+            <p class="text-gray-800 whitespace-pre-wrap">{{ review.content }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow-md p-12 text-center">
+    <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+    </svg>
+    <h2 class="text-2xl font-bold text-gray-900 mb-2">
+        No Reviews Yet
+    </h2>
+    <p class="text-gray-600 mb-6">
+        This track hasn't received any reviews yet.
+    </p>
+    <a href="{% url 'track_detail' track.id %}" class="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors">
+        Be the First to Review
+    </a>
+</div>
+{% endif %}
+{% endblock %}

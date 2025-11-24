@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+
+{% block title %}{{ track.title }} - Masterswap{% endblock %}
+
+{% block extra_head %}
+<!-- WaveSurfer.js -->
+<script src="https://unpkg.com/wavesurfer.js@7"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Back Button -->
+<div class="mb-6">
+    <a href="{% url 'browse_tracks' %}" class="inline-flex items-center text-gray-600 hover:text-gray-900">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Browse
+    </a>
+</div>
+
+<div class="grid md:grid-cols-3 gap-8">
+    <!-- Main Content -->
+    <div class="md:col-span-2">
+        <!-- Track Info -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ track.title }}</h1>
+
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6">
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    <a href="{% url 'user_profile' track.uploader.id %}" class="hover:text-primary-600">
+                        {{ track.uploader.email.split('@').0|title }}
+                    </a>
+                </div>
+
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    {{ track.duration_minutes }}
+                </div>
+
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    {{ track.uploaded_at|timesince }} ago
+                </div>
+
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                    </svg>
+                    {{ track.review_count }} review{{ track.review_count|pluralize }}
+                </div>
+            </div>
+
+            {% if track.feedback_request %}
+            <div class="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
+                <h3 class="font-semibold text-primary-900 mb-2">Feedback Request:</h3>
+                <p class="text-primary-800">{{ track.feedback_request }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Audio Player -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Audio Player</h2>
+
+            <div id="waveform" class="mb-4"></div>
+
+            <div class="flex items-center justify-between mb-4">
+                <button id="playPauseBtn" class="px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors">
+                    <span id="playIcon">▶ Play</span>
+                    <span id="pauseIcon" class="hidden">⏸ Pause</span>
+                </button>
+
+                <div class="text-sm text-gray-600">
+                    <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+                </div>
+            </div>
+
+            <div id="progressIndicator" class="mb-4">
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="text-gray-700 font-medium">Listening Progress</span>
+                    <span id="progressText" class="text-primary-600 font-semibold">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="progressBar" class="bg-primary-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div id="unlockMessage" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div class="flex">
+                    <svg class="w-5 h-5 text-yellow-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <p class="text-sm text-yellow-800">
+                        <strong>Review form locked.</strong> You must listen to the entire track before you can submit a review.
+                    </p>
+                </div>
+            </div>
+
+            <div id="unlockedMessage" class="bg-green-50 border border-green-200 rounded-lg p-4 hidden">
+                <div class="flex">
+                    <svg class="w-5 h-5 text-green-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <p class="text-sm text-green-800">
+                        <strong>Review form unlocked!</strong> You can now submit your review below.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Review Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6" id="reviewFormSection">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Submit Your Review</h2>
+
+            <form method="post" id="reviewForm" x-data="{
+                equipment: '',
+                content: '',
+                loading: false,
+                error: '',
+                characterCount: 0,
+                updateCount() {
+                    this.characterCount = this.content.length;
+                }
+            }">
+                {% csrf_token %}
+
+                <div class="mb-6">
+                    <label for="equipment" class="block text-sm font-medium text-gray-700 mb-2">
+                        What equipment are you listening on? *
+                    </label>
+                    <input
+                        type="text"
+                        id="equipment"
+                        name="equipment"
+                        x-model="equipment"
+                        required
+                        disabled
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="e.g., Yamaha HS8 monitors, treated room"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Be specific about your listening environment</p>
+                </div>
+
+                <div class="mb-6">
+                    <label for="content" class="block text-sm font-medium text-gray-700 mb-2">
+                        Your Review * (minimum 200 characters)
+                    </label>
+                    <textarea
+                        id="content"
+                        name="content"
+                        x-model="content"
+                        @input="updateCount"
+                        required
+                        disabled
+                        rows="8"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Write a detailed, constructive review. Be specific about what works well and what could be improved. If the uploader requested specific feedback, try to address it."
+                    ></textarea>
+                    <div class="flex justify-between items-center mt-1">
+                        <p class="text-xs text-gray-500">Be specific, constructive, and helpful</p>
+                        <p class="text-xs" :class="characterCount >= 200 ? 'text-green-600 font-semibold' : 'text-gray-500'">
+                            <span x-text="characterCount"></span> / 200 characters
+                        </p>
+                    </div>
+                </div>
+
+                <div x-show="error" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm text-red-800" x-text="error"></p>
+                </div>
+
+                <button
+                    type="submit"
+                    id="submitBtn"
+                    disabled
+                    class="w-full px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                    Submit Review & Earn 1 Token
+                </button>
+            </form>
+        </div>
+
+        <!-- Existing Reviews -->
+        {% if reviews %}
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">
+                Reviews ({{ reviews|length }})
+            </h2>
+
+            <div class="space-y-6">
+                {% for review in reviews %}
+                <div class="border-b border-gray-200 last:border-0 pb-6 last:pb-0">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <a href="{% url 'user_profile' review.reviewer.id %}" class="font-semibold text-gray-900 hover:text-primary-600">
+                                {{ review.reviewer.email.split('@').0|title }}
+                            </a>
+                            <p class="text-sm text-gray-500">{{ review.created_at|timesince }} ago</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-3 mb-3">
+                        <p class="text-sm text-gray-700">
+                            <strong>Listening on:</strong> {{ review.equipment }}
+                        </p>
+                    </div>
+
+                    <p class="text-gray-800 whitespace-pre-wrap">{{ review.content }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="md:col-span-1">
+        <!-- Review Stats -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Track Stats</h3>
+
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">Total Reviews:</span>
+                    <span class="font-semibold text-gray-900">{{ track.review_count }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">File Size:</span>
+                    <span class="font-semibold text-gray-900">{{ track.file_size_mb }} MB</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">Duration:</span>
+                    <span class="font-semibold text-gray-900">{{ track.duration_minutes }}</span>
+                </div>
+            </div>
+
+            {% if track.review_count > 0 %}
+            <div class="mt-6">
+                <a href="{% url 'track_reviews' track.id %}" class="block w-full text-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                    View All Reviews
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tips -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-blue-900 mb-3">Review Tips</h3>
+            <ul class="space-y-2 text-sm text-blue-800">
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Be specific about frequencies, dynamics, and spatial elements</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Mention both what works well and what could improve</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Address the feedback request if provided</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Be constructive and respectful</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    let wavesurfer;
+    let hasListenedFully = false;
+    let maxProgressReached = 0;
+
+    // Get streaming URL
+    const trackId = '{{ track.id }}';
+    const response = await fetch(`/api/tracks/${trackId}/stream`, {
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    });
+    const data = await response.json();
+    const audioUrl = data.url;
+
+    // Initialize WaveSurfer
+    wavesurfer = WaveSurfer.create({
+        container: '#waveform',
+        waveColor: '#94a3b8',
+        progressColor: '#0284c7',
+        cursorColor: '#0ea5e9',
+        barWidth: 2,
+        barRadius: 3,
+        cursorWidth: 1,
+        height: 80,
+        barGap: 2
+    });
+
+    wavesurfer.load(audioUrl);
+
+    // Update time display
+    wavesurfer.on('ready', function() {
+        const duration = wavesurfer.getDuration();
+        document.getElementById('totalTime').textContent = formatTime(duration);
+    });
+
+    wavesurfer.on('audioprocess', function() {
+        const currentTime = wavesurfer.getCurrentTime();
+        const duration = wavesurfer.getDuration();
+
+        document.getElementById('currentTime').textContent = formatTime(currentTime);
+
+        // Update progress
+        const progress = (currentTime / duration) * 100;
+        maxProgressReached = Math.max(maxProgressReached, progress);
+
+        document.getElementById('progressBar').style.width = maxProgressReached + '%';
+        document.getElementById('progressText').textContent = Math.round(maxProgressReached) + '%';
+
+        // Unlock form when 95% played (allowing for slight variance)
+        if (maxProgressReached >= 95 && !hasListenedFully) {
+            unlockReviewForm();
+        }
+    });
+
+    // Play/Pause button
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+
+    playPauseBtn.addEventListener('click', function() {
+        wavesurfer.playPause();
+    });
+
+    wavesurfer.on('play', function() {
+        playIcon.classList.add('hidden');
+        pauseIcon.classList.remove('hidden');
+    });
+
+    wavesurfer.on('pause', function() {
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+    });
+
+    wavesurfer.on('finish', function() {
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+        unlockReviewForm();
+    });
+
+    function unlockReviewForm() {
+        if (hasListenedFully) return;
+
+        hasListenedFully = true;
+
+        // Enable form fields
+        document.getElementById('equipment').disabled = false;
+        document.getElementById('content').disabled = false;
+        document.getElementById('submitBtn').disabled = false;
+
+        // Update messages
+        document.getElementById('unlockMessage').classList.add('hidden');
+        document.getElementById('unlockedMessage').classList.remove('hidden');
+
+        // Scroll to form
+        document.getElementById('reviewFormSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Form submission
+    document.getElementById('reviewForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const equipment = document.getElementById('equipment').value.trim();
+        const content = document.getElementById('content').value.trim();
+
+        if (!hasListenedFully) {
+            alert('You must listen to the entire track before submitting a review.');
+            return;
+        }
+
+        if (content.length < 200) {
+            alert('Your review must be at least 200 characters long.');
+            return;
+        }
+
+        if (!equipment) {
+            alert('Please specify your listening equipment.');
+            return;
+        }
+
+        // Submit review
+        try {
+            const response = await fetch('/api/reviews/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    track_id: trackId,
+                    equipment: equipment,
+                    content: content,
+                    listening_duration: Math.floor(wavesurfer.getDuration())
+                })
+            });
+
+            if (response.ok) {
+                window.location.href = '{% url "my_reviews" %}';
+            } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to submit review. Please try again.');
+            }
+        } catch (error) {
+            alert('Network error. Please check your connection and try again.');
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -19,7 +19,7 @@ A web application for audio engineers to exchange mix feedback. Users earn token
 - **Storage**: Cloudflare R2 (S3-compatible) for audio files
 - **Authentication**: django-sesame for magic links
 - **Background Tasks**: Celery + Redis
-- **Frontend**: Django templates + Tailwind CSS + Vanilla JS
+- **Frontend**: Django templates + Tailwind CSS + Alpine.js + WaveSurfer.js
 
 ## Project Structure
 
@@ -41,8 +41,8 @@ masterswap/
 │   ├── settings.py       # Configuration
 │   ├── urls.py           # URL routing
 │   └── celery.py         # Celery configuration
-├── templates/            # Django templates (to be created)
-├── static/               # Static files (CSS, JS)
+├── templates/            # Django templates (13 complete)
+├── static/               # Static files (CSS, JS, images)
 ├── requirements.txt      # Python dependencies
 ├── .env.example          # Environment variables template
 └── README.md            # This file
@@ -205,18 +205,23 @@ Once the server is running, visit:
 ✅ Celery + Redis setup
 ✅ Email notifications
 ✅ Admin interface configuration
+✅ All Django templates (13 pages)
+✅ Tailwind CSS styling (via CDN)
+✅ WaveSurfer.js audio player with waveform visualization
+✅ Alpine.js interactive components
+✅ File upload with client-side validation
+✅ Responsive mobile-first design
 
-## Next Steps (Not Yet Implemented)
+## Next Steps (Backend Integration Needed)
 
-- [ ] Create all Django templates
-- [ ] Implement Tailwind CSS styling
-- [ ] Build audio player with progress tracking
-- [ ] Add frontend JavaScript for file uploads
-- [ ] Create Docker configuration
-- [ ] Set up fly.io deployment
+- [ ] Update Django views with correct context variables
+- [ ] Add missing URL patterns (logout, flag_review, delete_track)
+- [ ] Add model property methods (duration_minutes, file_size_mb, review_count)
 - [ ] Add comprehensive testing
 - [ ] Implement rate limiting
-- [ ] Add pagination to templates
+- [ ] Add pagination logic to views
+
+See `BACKEND_UPDATES_NEEDED.md` for complete integration checklist.
 
 ## Deployment
 
